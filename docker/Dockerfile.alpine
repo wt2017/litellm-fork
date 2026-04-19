@@ -13,11 +13,16 @@ WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache gcc python3-dev musl-dev
 
-RUN pip install --upgrade pip==26.0.1 && \
+RUN pip install --upgrade pip && \
     pip install build==1.4.2
 
 # Copy the current directory contents into the container at /app
 COPY . .
+
+RUN apk add --no-cache ca-certificates tzdata && \
+    update-ca-certificates
+
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
 # Build the package
 RUN rm -rf dist/* && python -m build
@@ -27,6 +32,8 @@ RUN ls -1 dist/*.whl | head -1
 
 # Install the package
 RUN pip install dist/*.whl
+
+RUN apk add --no-cache gcc g++
 
 # install dependencies as wheels
 RUN pip wheel --no-cache-dir --wheel-dir=/wheels/ -r requirements.txt
@@ -45,6 +52,8 @@ COPY --from=builder /wheels/ /wheels/
 
 # Install the built wheel using pip; again using a wildcard if it's the only file
 RUN pip install *.whl /wheels/* --no-index --find-links=/wheels/ --no-deps && rm -f *.whl && rm -rf /wheels
+
+COPY --from=builder /app/docker /app/docker
 
 # Convert Windows line endings to Unix for entrypoint scripts
 RUN sed -i 's/\r$//' docker/entrypoint.sh && chmod +x docker/entrypoint.sh
